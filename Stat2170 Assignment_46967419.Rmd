@@ -1,0 +1,419 @@
+---
+title: "Applied Statistics Assignment"
+author: "Alexander Jones"
+date: "2024-05-10"
+output: 
+  pdf_document:
+  latex_engine: xelatex # or pdflatex, lualatex, etc.
+geometry: margin=1in
+fontsize: 11pt
+---
+
+\# Question 1:
+
+\## a. Scatter plot of Sales against Index
+
+```{r load-sales-data, echo=TRUE}
+# Load necessary package
+library(ggplot2)
+
+# Load the dataset
+sales_data <- read.csv("sales.csv")
+
+# Display first few rows of the dataset to understand its structure
+head(sales_data)
+```
+
+```{r scatter-plot, echo=TRUE}
+# Create a scatter plot
+ggplot(sales_data, aes(x = Index, y = Sales)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = "blue") +  # Add a linear trend line
+  labs(title = "Scatter plot of Sales against Consumer Confidence Index",
+       x = "Consumer Confidence Index",
+       y = "Retail Sales")
+```
+
+### Comments on the Scatter Plot
+
+From the scatter plot of Sales against Consumer Confidence Index, it is apparent that higher values of the Consumer Confidence Index tend to be associated with higher changes in retail sales. This suggests a positive relationship between these two variables, indicating that as consumer confidence improves, retail sales are likely to increase as well.
+
+## b. Fit a Simple Linear Regression Model and Validate
+
+```{r fit-linear-model, echo=TRUE}
+# Fit a simple linear regression model
+M1 <- lm(Sales ~ Index, data = sales_data)
+summary(M1)
+
+# Diagnostic plots for the linear regression model
+par(mfrow = c(2, 2))  # Arrange plots in a 2x2 grid
+plot(M1)
+```
+
+### Comments on the Diagnostic Plots
+
+1.  **Residuals vs Fitted**: There is a clear pattern (a curve) in the residuals, suggesting that the relationship between Index and Sales might not be strictly linear. This indicates a potential problem with the linearity assumption.
+2.  **Normal Q-Q**: The Q-Q plot shows a slight deviation from the straight line, especially at the tails, indicating the residuals are not perfectly normally distributed.
+3.  **Scale-Location**: The spread of residuals seems to increase with the fitted values, indicating heteroscedasticity (non-constant variance of residuals).
+4.  **Residuals vs Leverage**: Some points have high leverage (possible outliers), which can have a significant influence on the regression results.
+
+## c. Fit Polynomial Models
+
+```{r fit-polynomial-models, echo=TRUE}
+# Fit quadratic model
+M2 <- lm(Sales ~ poly(Index, 2), data = sales_data)
+
+# Fit cubic model
+M3 <- lm(Sales ~ poly(Index, 3), data = sales_data)
+
+# Display the summaries of both models
+summary(M2)
+summary(M3)
+```
+
+### Comments Based on Model Summaries
+
+-   **Quadratic Model (M2)**:
+-   Multiple R-squared: 0.9513, Adjusted R-squared: 0.9509
+-   Both polynomial terms (`poly(Index, 2)1` and `poly(Index, 2)2`) are highly significant with p-values \< 2e-16.
+-   **Cubic Model (M3)**:
+-   Multiple R-squared: 0.9513, Adjusted R-squared: 0.9507
+-   The cubic term (`poly(Index, 3)3`) is not significant with a p-value of 0.847, suggesting that it does not contribute much to the model.
+
+From these results, it appears that the quadratic model (M2) provides a better fit without adding unnecessary complexity, as the cubic term is not significant.
+
+## d. Plot the Data and Add Predicted Lines from M1, M2, and M3
+
+```{r plot-predicted-lines, echo=TRUE}
+# Predictions
+sales_data$Pred_M1 <- predict(M1, sales_data)
+sales_data$Pred_M2 <- predict(M2, sales_data)
+sales_data$Pred_M3 <- predict(M3, sales_data)
+
+# Check predictions
+print(head(sales_data$Pred_M1))
+print(head(sales_data$Pred_M2))
+print(head(sales_data$Pred_M3))
+
+# Creating the plot
+ggplot(sales_data, aes(x = Index, y = Sales)) +
+  geom_point() +
+  geom_line(aes(y = Pred_M1, color = "Linear (M1)"), linetype = "dashed") +
+  geom_line(aes(y = Pred_M2, color = "Quadratic (M2)"), linetype = "dotted") +
+  geom_line(aes(y = Pred_M3, color = "Cubic (M3)"), linetype = "solid") +
+  scale_color_manual(values = c("Linear (M1)" = "blue", "Quadratic (M2)" = "red", "Cubic (M3)" = "green")) +
+  labs(title = "Scatter Plot with Model Predictions",
+       x = "Consumer Confidence Index",
+       y = "Retail Sales",
+       color = "Model") +
+  theme_minimal()
+```
+
+### Comments on the Fit of the Models
+
+-   **Linear Model (M1)**:
+-   Represented by the blue dashed line.
+-   The linear model does not capture the curvature observed in the data, particularly at higher and lower values of the Consumer Confidence Index. This is evident from the substantial deviation of the data points from the predicted line in these regions.
+-   **Quadratic Model (M2)**:
+-   Represented by the red dotted line.
+-   The quadratic model fits the data better than the linear model, especially capturing the curvature. However, its performance at extreme ends may still be suboptimal compared to the cubic model.
+-   **Cubic Model (M3)**:
+-   Represented by the green solid line.
+-   The cubic model captures the overall trend and curvature of the data, fitting well across the entire range of the Consumer Confidence Index.
+-   Despite this, the cubic term itself is not statistically significant, suggesting it may not add meaningful predictive power beyond the quadratic model.
+
+## e. Assess the Significance of Linear, Quadratic, and Cubic Terms in M3 using Sequential Sum of Squares
+
+```{r sequential-anova, echo=TRUE}
+# Perform ANOVA to check significance of terms in model M3
+anova_M3 <- anova(lm(Sales ~ 1, data = sales_data), 
+                  lm(Sales ~ poly(Index, 1), data = sales_data),
+                  lm(Sales ~ poly(Index, 2), data = sales_data),
+                  lm(Sales ~ poly(Index, 3), data = sales_data))
+anova_M3
+```
+
+### Comments on the ANOVA Table
+
+-   **Model 1 (Intercept only)**:
+-   Residual Degrees of Freedom (Res.Df): 242
+-   Residual Sum of Squares (RSS): 31063.2
+-   **Model 2 (Linear term)**:
+-   Residual Degrees of Freedom (Res.Df): 241
+-   Residual Sum of Squares (RSS): 10027.2
+-   Sum of Squares for the addition of the linear term: 21036.0
+-   F-statistic: 3322.5228, p-value: \<2e-16 (Highly significant)
+-   **Model 3 (Quadratic term)**:
+-   Residual Degrees of Freedom (Res.Df): 240
+-   Residual Sum of Squares (RSS): 1513.4
+-   Sum of Squares for the addition of the quadratic term: 8513.8
+-   F-statistic: 1344.7051, p-value: \<2e-16 (Highly significant)
+-   **Model 4 (Cubic term)**:
+-   Residual Degrees of Freedom (Res.Df): 239
+-   Residual Sum of Squares (RSS): 1513.2
+-   Sum of Squares for the addition of the cubic term: 0.2
+-   F-statistic: 0.0375, p-value: 0.8466 (Not significant)
+
+### Interpretation
+
+The ANOVA results suggest that: - Adding the linear and quadratic terms significantly improves the model fit, as indicated by the highly significant p-values. - However, the cubic term does not provide a significant improvement (p-value of 0.846), confirming that it does not add meaningful predictive power beyond the quadratic model (M2).
+
+## f. Validate the Best Model (Quadratic Model M2)
+
+Based on the analysis above, the quadratic model (M2) is selected as the best model. Let's validate it further.
+
+```{r validate-best-model, echo=TRUE}
+# Diagnostic plots for the quadratic model (M2)
+par(mfrow = c(2, 2))  # Arrange plots in a 2x2 grid
+plot(M2)
+```
+
+### Comments on the Diagnostic Plots for the Quadratic Model (M2)
+
+1.  **Residuals vs Fitted**:
+    -   The residuals appear more randomly scattered around the horizontal axis compared to the linear model, indicating improved linearity.
+    -   There is no evident pattern in the residuals, suggesting a better fit.
+2.  **Normal Q-Q**:
+    -   The residuals mostly follow the normality line, though there are slight deviations at the tails.
+    -   This indicates that the residuals are approximately normally distributed.
+3.  **Scale-Location**:
+    -   The residuals are more homogeneously spread along the range of fitted values, suggesting homoscedasticity (consistent variance).
+    -   The horizontal line is relatively flat, indicating no strong pattern of heteroscedasticity.
+4.  **Residuals vs Leverage**:
+    -   There are a few points with high leverage, but they do not seem to exert excessive influence on the model.
+    -   The Cook's distance lines suggest that there are no problematic outliers significantly affecting the model.
+
+## Conclusion
+
+Based on the diagnostic checks and the ANOVA results, the quadratic model (M2) is the best model among M1, M2, and M3. It provides a significantly better fit than the linear model (M1) and does not add unnecessary complexity like the cubic model (M3).
+
+## Question 2:
+
+# Load Required Packages
+
+```{r setup, include=FALSE}
+required_packages <- c("dplyr", "ggplot2", "lmtest")
+
+for(package in required_packages){
+  if(!require(package, character.only = TRUE)){
+    install.packages(package, dependencies = TRUE)
+    library(package, character.only = TRUE)
+  }
+}
+```
+
+# Load Dataset
+
+```{r load-campaign-data, echo=TRUE}
+# Load the dataset
+campaign_data <- read.csv("campaign.csv")
+
+# Display first few rows of the data to understand its structure
+head(campaign_data)
+summary(campaign_data)
+```
+
+# Preliminary Graphs
+
+## 1. Boxplot of Engagement Score by Type and Region
+
+```{r boxplot-type-region, echo=TRUE}
+# Boxplot of Engagement Score by Type and Region
+ggplot(campaign_data, aes(x = Type, y = Score, fill = Region)) +
+  geom_boxplot() +
+  labs(title = "Engagement Score by Type and Region",
+       x = "Type of Marketing Campaign",
+       y = "Engagement Score") +
+  theme_minimal()
+```
+
+## 2. Interaction Plot
+
+```{r interaction-plot, echo=TRUE}
+# Interaction Plot
+interaction.plot(
+  x.factor = campaign_data$Type, 
+  trace.factor = campaign_data$Region, 
+  response = campaign_data$Score, 
+  fun = mean, 
+  type = "b",
+  col = c("red", "blue"), 
+  xlab = "Type of Marketing Campaign", 
+  ylab = "Mean Engagement Score", 
+  trace.label = "Region",
+  legend = TRUE
+)
+```
+
+# Full Interaction Model
+
+## a. Fit the Full Interaction Model
+
+```{r full-interaction-model, echo=TRUE}
+# Fit the linear model with interaction
+model_interaction <- lm(Score ~ Type * Region, data = campaign_data)
+summary(model_interaction)
+```
+
+### Interpretation of the Full Interaction Model
+
+The results from the full interaction model are as follows:
+
+\#### Coefficients and Their Significance
+
+-   **(Intercept)** represents the baseline engagement score for Billboard campaigns in Rural regions.
+-   **Type (Email)** and **Type (Social Media)** coefficients are significantly positive, indicating higher engagement scores compared to Billboard campaigns.
+-   **Region (Urban)** coefficient is significantly positive, suggesting higher engagement scores in Urban regions compared to Rural regions.
+-   The interaction terms are not statistically significant, suggesting no significant interaction effects between type and region on engagement scores.
+
+# Model Assumptions Check
+
+## Diagnostic Plots
+
+```{r diagnostic-plots, echo=TRUE}
+# Diagnostic plots for linear model
+par(mfrow = c(2, 2))
+plot(model_interaction)
+```
+
+## Normality of Residuals
+
+```{r shapiro-test, echo=TRUE}
+# Shapiro-Wilk test for normality
+shapiro_test <- shapiro.test(residuals(model_interaction))
+shapiro_test
+```
+
+## Homoscedasticity
+
+```{r breusch-pagan-test, echo=TRUE}
+# Breusch-Pagan test for homoscedasticity
+bp_test <- bptest(model_interaction)
+bp_test
+```
+
+### ANOVA for the Full Interaction Model
+
+```{r perform-anova, echo=TRUE}
+# Perform ANOVA for the full interaction model
+anova_results <- anova(model_interaction)
+anova_results
+```
+
+### Interpretation
+
+1.  **Effect of `Type`**:
+
+-   $H_0$: No effect of campaign type on engagement score.
+-   $H_A$: Significant effect of campaign type on engagement score.
+-   **Result**: p-value for `Type` is \< 2.2e-16, rejecting $H_0$.
+
+2.  **Effect of `Region`**:
+
+-   $H_0$: No effect of region on engagement score.
+-   $H_A$: Significant effect of region on engagement score.
+-   **Result**: p-value for `Region` is 2.336e-16, rejecting $H_0$.
+
+3.  **Interaction Effect (`Type:Region`)**:
+
+-   $H_0$: No interaction effect between campaign type and region on engagement score.
+-   $H_A$: Significant interaction effect between campaign type and region on engagement score.
+-   **Result**: p-value for the interaction term `Type:Region` is 0.7657, failing to reject $H_0$.
+
+### Conclusion on Full Interaction Model
+
+Since the interaction terms are not significant, we can consider fitting a simpler model without interaction terms and analyze the main effects directly.
+
+# Main Effects Only Model
+
+## Fit the Model Without Interaction Term
+
+```{r main-effects-model, echo=TRUE}
+# Fit the linear model without interaction term
+model_main_effects <- lm(Score ~ Type + Region, data = campaign_data)
+summary(model_main_effects)
+```
+
+## Conduct ANOVA for Main Effects
+
+```{r anova-main-effects, echo=TRUE}
+# Perform ANOVA for the main effects model
+anova_results_main <- anova(model_main_effects)
+anova_results_main
+```
+
+## Interpretation
+
+### ANOVA Results for Main Effects
+
+-   **Effect of `Type`**:
+    -   $H_0$: No effect of campaign type on engagement score.
+-   $H_A$: Significant effect of campaign type on engagement score.
+-   **Result**: p-value for `Type` is \< 2.2e-16, rejecting $H_0$.
+-   **Effect of `Region`**:
+    -   $H_0$: No effect of region on engagement score.
+-   $H_A$: Significant effect of region on engagement score.
+-   **Result**: p-value for `Region` is \< 2.2e-16, rejecting $H_0$.
+
+## Conclusion on Main Effects Model
+
+Given the results of the ANOVA, both campaign `Type` and `Region` each have a statistically significant effect on engagement scores. There is no significant interaction between `Type` and `Region`.
+
+# Multiple Comparisons Using TukeyHSD
+
+## Check for Balanced Design
+
+```{r check-balance, echo=TRUE}
+# Check for balanced design
+table(campaign_data$Type, campaign_data$Region)
+```
+
+## Perform Tukey's HSD Test
+
+```{r tukey-hsd, echo=TRUE}
+# Perform Tukey HSD for the fitted model without interaction term
+tukey_results <- TukeyHSD(aov(model_main_effects))
+
+# Display TukeyHSD results for Type and Region
+tukey_results$Type
+tukey_results$Region
+```
+
+## Interpretation
+
+### TukeyHSD Results - Campaign Type
+
+```{r}
+tukey_results$Type
+```
+
+### TukeyHSD Results - Region
+
+```{r}
+tukey_results$Region
+```
+
+## Summary of Findings Using TukeyHSD
+
+1.  **Campaign Type**:
+
+-   **Email vs. Billboard**: Email campaigns are significantly more effective than Billboard campaigns (p \< 0.05).
+-   **Social Media vs. Billboard**: Social Media campaigns are significantly more effective than Billboard campaigns (p \< 0.05).
+-   **Social Media vs. Email**: Social Media campaigns are significantly more effective than Email campaigns (p \< 0.05).
+
+2.  **Region**:
+
+-   **Urban vs. Rural**: Campaigns in Urban regions result in significantly higher engagement scores compared to Rural regions (p \< 0.05).
+
+### Final Summary and Conclusions
+
+-   **Main Effects**:
+    -   The type of marketing campaign significantly impacts engagement scores, with Social Media being the most effective, followed by Email, and then Billboard campaigns.
+-   The region also significantly impacts engagement scores, with Urban regions yielding higher scores compared to Rural regions.
+-   **Implications**:
+    -   Companies should prioritize Social Media and Email campaigns over Billboard campaigns.
+-   Urban regions should be targeted for higher engagement.
+
+### Conclusion
+
+This analysis demonstrates the importance of considering both the type of marketing campaign and the geographic region when planning marketing strategies. Companies aiming for higher engagement should invest more in Social Media and Email campaigns, especially in Urban regions. Further, no significant interaction between campaign type and region was detected, simplifying the focus on main effects alone.
